@@ -16,4 +16,6 @@ Additional browser checks passed: Explore shows five sample destination cards; R
 
 `dashboard-desktop.png` and `dashboard-mobile.png` show the actual running implementation. Desktop photos and OpenStreetMap cartography are licensed substitutes for the generated reference assets. Exact generated map topology is intentionally not reproduced as navigation.
 
+Final map check: all five numbered markers were confirmed not to intersect the weather overlay. Fit padding and per-stop label directions avoid hiding the northern stop under the weather panel.
+
 The selected calendar date is currently a frontend display setting; the legacy live API accepts city, interests and budget only. No opening-date or forecast validation is claimed. Live plans cannot preserve locked stops yet, and clearly refuse such a request rather than silently replacing them.

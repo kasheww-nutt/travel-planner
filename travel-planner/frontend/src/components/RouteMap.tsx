@@ -22,8 +22,8 @@ function Controls({
     );
     if (points.length)
       map.fitBounds(points, {
-        paddingTopLeft: [40, 40],
-        paddingBottomRight: [75, 25],
+        paddingTopLeft: [55, 115],
+        paddingBottomRight: [150, 55],
         maxZoom: 13,
         animate: false,
       });

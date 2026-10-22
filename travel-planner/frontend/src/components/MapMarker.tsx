@@ -24,7 +24,7 @@ export default function MapMarker({
       title={`Stop ${place.order}: ${place.name}`}
       eventHandlers={{ click: onSelect }}
     >
-      <Tooltip direction="right" permanent>
+      <Tooltip direction={place.order===5?'top':place.order===3?'left':place.order===4?'bottom':'right'} permanent>
         {place.name}
       </Tooltip>
     </Marker>
