@@ -1,0 +1,65 @@
+[
+  {
+    "id": "sensoji",
+    "title": "File:Five-storied Pagoda of Sensoji Temple in Tokyo, 20240824 1103 5615.jpg",
+    "artist": "Jakub Ha\u0142un",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Five-storied_Pagoda_of_Sensoji_Temple_in_Tokyo,_20240824_1103_5615.jpg",
+    "changes": "Thumbnail cropped by CSS in the interface."
+  },
+  {
+    "id": "tsukiji",
+    "title": "File:Tsukiji Outer Market -04.jpg",
+    "artist": "Aimaimyi",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Tsukiji_Outer_Market_-04.jpg",
+    "changes": "Thumbnail cropped by CSS in the interface."
+  },
+  {
+    "id": "mori",
+    "title": "File:Mori Art Museum Tokyo, Japan 03.jpg",
+    "artist": "Igbofur",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Mori_Art_Museum_Tokyo,_Japan_03.jpg",
+    "changes": "Thumbnail cropped by CSS in the interface."
+  },
+  {
+    "id": "tea",
+    "title": "File:Matcha.gif",
+    "artist": "The original uploader was Exploding Boy at English Wikipedia.",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Matcha.gif",
+    "changes": "Thumbnail cropped by CSS in the interface."
+  },
+  {
+    "id": "izakaya",
+    "title": "File:Gion Kappa Restaurant in Kyoto.jpg",
+    "artist": "Mx. Granger",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:Gion_Kappa_Restaurant_in_Kyoto.jpg",
+    "changes": "Thumbnail cropped by CSS in the interface."
+  },
+  {
+    "id": "garden",
+    "title": "File:Cherry Blossoms in Shinjuku Gyoen(Shinjuku Imperial Garden) - \u65b0\u5bbf\u5fa1\u82d1\u306e\u685c - panoramio.jpg",
+    "artist": "Carbonium",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Cherry_Blossoms_in_Shinjuku_Gyoen(Shinjuku_Imperial_Garden)_-_%E6%96%B0%E5%AE%BF%E5%BE%A1%E8%8B%91%E3%81%AE%E6%A1%9C_-_panoramio.jpg",
+    "changes": "Thumbnail cropped by CSS in the interface."
+  },
+  {
+    "id": "avatar",
+    "title": "File:Mount Fuji from Lake Yamanaka.JPG",
+    "artist": "Alpsdake",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Mount_Fuji_from_Lake_Yamanaka.JPG",
+    "changes": "Thumbnail cropped by CSS in the interface."
+  }
+]

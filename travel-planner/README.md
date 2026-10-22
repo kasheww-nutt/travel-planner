@@ -1,10 +1,10 @@
 # Day, together — Multi-Agent Travel Day Planner
 
-Enter a city, interests, and a USD budget. Watch four agents collaborate through a live graph and message log, then explore their chronological itinerary.
+This separate checkout rebuilds the supplied dashboard in React + TypeScript. See [UI-REBUILD.md](../UI-REBUILD.md) for its demo/live modes, interactive map, verification, and current limitations.
 
-![Completed itinerary and agent graph](screenshot.png)
+![Rebuilt travel workspace](../qa/dashboard-desktop.png)
 
-Screenshot from browser verification using controlled offline responses, including a budget revision; this is not evidence of a live Groq call.
+Screenshot shows the labelled Tokyo demo. Live AI uses the actual backend event stream.
 
 ## Setup
 
@@ -18,7 +18,7 @@ python -m venv .venv
 Copy-Item travel-planner/.env.example travel-planner/.env
 # Edit travel-planner/.env and set GROQ_API_KEY to your own Groq API key.
 cd travel-planner/backend
-..\..\.venv\Scripts\python.exe -m uvicorn main:app --reload
+..\..\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8002
 ```
 
 In a second terminal, from the repository root:
@@ -29,9 +29,9 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:5173. The frontend proxies `/api` to the backend at http://localhost:8000. Missing credentials produce a readable setup error; the app does not silently replace live AI with canned results.
+Open http://127.0.0.1:5174. The frontend proxies `/api` to the cloned backend at http://127.0.0.1:8002. Demo replay is explicitly labelled; Live AI does not silently substitute sample responses.
 
-If port 8000 is already occupied, start Uvicorn with `--port 8001` and set `$env:API_PROXY_TARGET = "http://127.0.0.1:8001"` in the frontend terminal before `npm run dev`.
+To select a different cloned backend port, set `$env:API_PROXY_TARGET` in the frontend terminal before starting Vite. Keep the original version's ports unchanged.
 
 On macOS/Linux, create the environment with `python3 -m venv .venv`, use `.venv/bin/python` instead of `.venv/Scripts/python.exe`, and copy the environment template with `cp`.
 
@@ -55,7 +55,7 @@ flowchart LR
 
 - **Communication:** Every assignment, status, response, revision, error, and final plan passes through the per-session MessageBus. The SSE endpoint replays earlier messages before streaming new ones, so a late browser connection misses no events.
 - **Orchestration:** The planner splits the budget. Three specialists execute concurrently using `asyncio.gather()`. If costs exceed 110% of the budget, the orchestrator requests cheaper alternatives from the most expensive specialist, for at most two revision rounds.
-- **Agents:** Four prompt-specific agents share an `AsyncGroq` client and use `llama-3.1-8b-instant` with JSON object mode. Planner budget parsing has a deterministic fallback; unusable specialist results terminate with an explicit error. Costs are calculated from line items rather than trusting the final model's declared total.
+- **Agents:** Four prompt-specific agents share an `AsyncGroq` client and use `GROQ_MODEL` (default `openai/gpt-oss-20b`) with JSON object mode. The original `llama-3.1-8b-instant` returned `model_not_found` during live verification with the configured account. Planner budget parsing has a deterministic fallback; unusable specialist results terminate with an explicit error. Costs are calculated from line items rather than trusting the final model's declared total.
 - **Presentation:** The graph shows idle, thinking, done, revising, and interrupted states. All messages are expandable in the log. The final timeline includes the calculated total and a visible warning if it exceeds the requested budget.
 
 The one-second pre-call pause supports demo pacing; it cannot guarantee compliance with provider request/token quotas. SDK retries are bounded, individual calls time out, and a whole run has a three-minute deadline.

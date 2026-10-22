@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import math
+from groq import BadRequestError
 
 from agents import Agent
 from message_bus import MessageBus
@@ -116,7 +117,32 @@ class Orchestrator:
             content="planner is assembling the final itinerary...",
             metadata={"status": "thinking", "step": 5},
         ))
-        assemble_raw = await planner.run(
+        try:
+            assemble_raw = await self._assemble(planner, user_input, budget, interests, results)
+        except BadRequestError as exc:
+            body = exc.body if isinstance(exc.body, dict) else {}
+            detail = body.get("error", body)
+            if not isinstance(detail, dict) or detail.get("code") != "json_validate_failed":
+                raise
+            await self.bus.send(AgentMessage(
+                from_agent="planner", to_agent="user", message_type="status",
+                content="Using the specialists’ original suggestions to assemble your timeline.",
+                metadata={"status": "thinking", "step": 5, "fallback": True},
+            ))
+            assemble_raw = "{}"
+        final = self._build_itinerary(user_input.city, self._parse_json(assemble_raw), results)
+        if not final.items:
+            raise ValueError("The agents returned no usable itinerary. Please try again.")
+
+        final_json = final.model_dump_json()
+        await self.bus.send(AgentMessage(
+            from_agent="planner", to_agent="user", message_type="final_plan",
+            content=final_json, metadata={"total_cost": final.total_cost, "budget": budget, "step": 6},
+        ))
+        return final_json
+
+    async def _assemble(self, planner, user_input, budget, interests, results):
+        return await planner.run(
             f"Assemble a chronological day itinerary for {user_input.city} from 08:00 to 22:00.\n"
             f"User budget: ${budget:.2f} USD. Interests: {interests}.\n\n"
             f"TRANSPORT AGENT RESULT:\n{json.dumps(results['transport'])}\n\n"
@@ -127,17 +153,6 @@ class Orchestrator:
             from_agent="planner",
             metadata={"step": 5},
         )
-        final = self._build_itinerary(user_input.city, self._parse_json(assemble_raw), results)
-        if not final.items:
-            raise ValueError("The agents returned no usable itinerary. Please try again.")
-
-        # Step 6 — Broadcast final plan
-        final_json = final.model_dump_json()
-        await self.bus.send(AgentMessage(
-            from_agent="planner", to_agent="user", message_type="final_plan",
-            content=final_json, metadata={"total_cost": final.total_cost, "budget": budget, "step": 6},
-        ))
-        return final_json
 
     # ---------- helpers ----------
 

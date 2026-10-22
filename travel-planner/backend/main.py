@@ -39,6 +39,7 @@ app.add_middleware(
 
 sessions: dict[str, MessageBus] = {}
 background_tasks: set[asyncio.Task] = set()  # keep references so tasks aren't garbage-collected
+session_tasks: dict[str, asyncio.Task] = {}
 session_finished: dict[str, float] = {}
 SESSION_TTL = 3600
 MAX_SESSIONS = 100
@@ -50,6 +51,11 @@ TERMINAL_TYPES = ("final_plan", "error")
 async def run_orchestration(orchestrator: Orchestrator, bus: MessageBus, user_input: UserInput, client: AsyncGroq, session_id: str):
     try:
         await asyncio.wait_for(orchestrator.run(user_input), timeout=180)
+    except asyncio.CancelledError:
+        await bus.send(AgentMessage(
+            from_agent="system", to_agent="user", message_type="error",
+            content="Planning cancelled.",
+        ))
     except Exception as exc:  # surface any failure to the UI instead of hanging the stream
         logger.exception("Planning failed")
         message = "Planning failed. Check the backend logs and Groq configuration, then try again."
@@ -86,10 +92,23 @@ async def create_plan(user_input: UserInput):
     orchestrator = Orchestrator(agents, bus)
 
     task = asyncio.create_task(run_orchestration(orchestrator, bus, user_input, client, session_id))
+    session_tasks[session_id] = task
     background_tasks.add(task)
     task.add_done_callback(background_tasks.discard)
+    task.add_done_callback(lambda _: session_tasks.pop(session_id, None))
 
     return {"session_id": session_id}
+
+
+@app.delete("/api/plan/{session_id}")
+async def cancel_plan(session_id: str):
+    if session_id not in sessions:
+        raise HTTPException(404, "Planning session not found")
+    task = session_tasks.get(session_id)
+    if task and not task.done():
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    return {"status": "cancelled" if task else "finished"}
 
 
 @app.get("/api/stream/{session_id}")

@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import unittest
+import httpx
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -183,6 +184,35 @@ class ApiTests(unittest.TestCase):
                 self.assertIn('"message_type":"error"', response.text)
                 self.assertNotIn("secret provider details", response.text)
                 self.assertFalse(main.sessions[session_id].subscribers)
+
+
+class UiIntegrationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_provider_rejects_final_json_but_specialist_plan_survives(self):
+        from groq import BadRequestError
+        bus = MessageBus()
+        workflow = Orchestrator(fixture(bus), bus)
+        response = httpx.Response(400, request=httpx.Request("POST", "https://api.groq.com/test"))
+        failure = BadRequestError("Invalid JSON", response=response, body={"error": {"code": "json_validate_failed"}})
+        with patch.object(workflow, "_assemble", new=AsyncMock(side_effect=failure)):
+            result = json.loads(await workflow.run(UserInput(city="Tokyo", budget=100)))
+        self.assertEqual(result["total_cost"], 80)
+        self.assertEqual(len(result["items"]), 3)
+        self.assertTrue(any(m.metadata.get("fallback") for m in bus.log))
+        self.assertEqual(bus.log[-1].message_type, "final_plan")
+
+
+class CancelApiTests(unittest.TestCase):
+    def test_cancel_stops_background_work_and_terminates_stream(self):
+        async def slow_run(*args, **kwargs):
+            await asyncio.sleep(30)
+        with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}), patch("main.AsyncGroq", return_value=AsyncMock()), patch("main.Orchestrator.run", side_effect=slow_run):
+            with TestClient(main.app) as client:
+                session_id = client.post("/api/plan", json={"city": "Tokyo", "budget": 100}).json()["session_id"]
+                cancelled = client.delete(f"/api/plan/{session_id}")
+                self.assertEqual(cancelled.status_code, 200)
+                self.assertIn("Planning cancelled", client.get(f"/api/stream/{session_id}").text)
+                self.assertNotIn(session_id, main.session_tasks)
+                self.assertEqual(client.delete("/api/plan/unknown").status_code, 404)
 
 
 if __name__ == "__main__":

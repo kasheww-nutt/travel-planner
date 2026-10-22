@@ -1,0 +1,16 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=DM+Serif+Display&display=swap");
+:root {
+  --bg: #fbf8f3;
+  --surface: #fffdfa;
+  --peach: #fcf0e9;
+  --sage: #edf2e9;
+  --text: #102f27;
+  --body: #39434d;
+  --muted: #69716f;
+  --border: #e6ddd1;
+  --accent: #bb4f30;
+  --accent-dark: #a93f25;
+  --green: #168659;
+  --font-display: "DM Serif Display", Georgia, serif;
+  --font-ui: "DM Sans", Arial, sans-serif;
+}

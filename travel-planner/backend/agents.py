@@ -1,11 +1,12 @@
 import asyncio
+import os
 
 from groq import AsyncGroq
 
 from message_bus import MessageBus
 from models import AgentMessage
 
-MODEL = "llama-3.1-8b-instant"
+MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
 PLANNER_PROMPT = """You are the Planner Agent in a multi-agent travel planning system. Your job is to:
 1. Take user input (city, interests, budget) and split the budget across transport (~20%), dining (~35%), and activities (~45%).
@@ -71,8 +72,9 @@ class Agent:
                 {"role": "user", "content": task},
             ],
             temperature=0.7,
-            max_tokens=1024,
+            max_tokens=4096,
             response_format={"type": "json_object"},
+            extra_body={"reasoning_effort": "low"} if MODEL.startswith("openai/gpt-oss-") else {},
         )
         result = response.choices[0].message.content or ""
 
