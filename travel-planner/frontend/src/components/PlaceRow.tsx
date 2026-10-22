@@ -97,6 +97,7 @@ export default function PlaceRow({
         <div className="place-meta">
           <MapPin size={13} />
           <span>{place.area}</span>
+          {place.locationSource && <Tag>Map match confirmed</Tag>}
           <span className="category-chip">
             <Icon size={12} />
             {categories[place.category]}

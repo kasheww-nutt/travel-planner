@@ -22,6 +22,8 @@ import { MessageCard, titleOf } from "./components/RecentUpdates";
 import { newDemoTrip } from "./data/demoTrip";
 import credits from "./data/photoCredits.json";
 import usePlanner from "./hooks/usePlanner";
+import useForecast from "./hooks/useForecast";
+import TravelDataPanel from "./components/TravelDataPanel";
 import type { Trip, Tab } from "./types/trip";
 import { money } from "./types/trip";
 
@@ -32,6 +34,21 @@ export default function App() {
   const [mode, setMode] = useState<"demo" | "live">("demo");
   const [dialog, setDialog] = useState<string | null>(null);
   const { busy, error, plan, cancel, setError } = usePlanner(setTrip);
+  const forecast = useForecast(
+    trip.city,
+    trip.dateIso,
+    trip.source === "live" || dialog === "travel-data",
+  );
+  const liveWeather =
+    forecast.data?.status === "available"
+      ? {
+          title: `${forecast.data.condition} · ${forecast.data.temperature_2m_min}–${forecast.data.temperature_2m_max} °C`,
+          description: `${forecast.data.date} · ${forecast.data.precipitation_probability_max}% max daily precipitation probability`,
+          start: "",
+          end: "",
+          source: "Open-Meteo" as const,
+        }
+      : null;
   useEffect(() => {
     const read = () => {
       const value = location.hash.slice(1);
@@ -58,14 +75,12 @@ export default function App() {
   const select = (id: string, fromMap = false) => {
     setSelectedId(id);
     if (fromMap)
-      document
-        .getElementById(`place-${id}`)
-        ?.scrollIntoView({
-          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "instant"
-            : "smooth",
-          block: "nearest",
-        });
+      document.getElementById(`place-${id}`)?.scrollIntoView({
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+        block: "nearest",
+      });
   };
   const replace = (id: string) => {
     const place = trip.places.find((p) => p.id === id);
@@ -134,6 +149,9 @@ export default function App() {
               Reset sample
             </button>
           )}
+          <button onClick={() => setDialog("travel-data")}>
+            <MapPin size={12} /> Places & forecast
+          </button>
         </div>
         {error && (
           <div className="error-banner" role="alert">
@@ -200,11 +218,22 @@ export default function App() {
             )}
             <div className="right-column">
               <RouteMap
-                places={trip.places}
-                weather={trip.weather}
+                places={
+                  trip.source === "live"
+                    ? trip.places.map((p) => ({
+                        ...p,
+                        coordinates: p.locationSource
+                          ? p.coordinates
+                          : undefined,
+                      }))
+                    : trip.places
+                }
+                weather={trip.source === "live" ? liveWeather : trip.weather}
                 selectedId={selectedId}
                 onSelect={(id) => select(id, true)}
-                onWeather={() => setDialog("weather")}
+                onWeather={() =>
+                  setDialog(trip.source === "live" ? "travel-data" : "weather")
+                }
                 onTransport={() => setDialog("transport")}
               />
               <div className="right-footer-grid">
@@ -222,7 +251,7 @@ export default function App() {
             <Info size={12} />
             {trip.source === "demo"
               ? "A sample Tokyo day. Weather, costs and locations are illustrative."
-              : "AI suggestions, durations and locations are unverified. Illustrations do not depict venues."}
+              : "AI estimates · only confirmed place matches get pins. Lines are schematic; travel times and opening hours are unverified."}
           </span>
           <button className="text-link" onClick={() => setDialog("credits")}>
             Photo & map credits
@@ -243,11 +272,60 @@ export default function App() {
                     changes: "What changed, and why",
                     about: "Your travel workspace",
                     credits: "Photography & map credits",
+                    "travel-data": "Places & forecast",
                   }[dialog] || "A place worth exploring"
           }
           onClose={() => setDialog(null)}
         >
-          {activeAgent ? (
+          {dialog === "travel-data" ? (
+            <TravelDataPanel
+              trip={trip}
+              busy={busy}
+              forecast={forecast.data}
+              loading={forecast.loading}
+              error={forecast.error}
+              onRetry={forecast.retry}
+              onDate={(dateIso) => onChange({ dateIso })}
+              onConfirm={(id, candidate) => {
+                if (busy) return;
+                setTrip((prev) => ({
+                  ...prev,
+                  places: prev.places.map((p) =>
+                    p.id === id && !p.isLocked
+                      ? {
+                          ...p,
+                          coordinates: candidate.coordinates,
+                          area: candidate.address || candidate.name,
+                          locationSource: {
+                            name: candidate.name,
+                            address: candidate.address,
+                            url: candidate.source_url,
+                            confirmedAt: new Date().toISOString(),
+                          },
+                        }
+                      : p,
+                  ),
+                }));
+                setSelectedId(id);
+              }}
+              onClear={(id) => {
+                if (busy) return;
+                setTrip((prev) => ({
+                  ...prev,
+                  places: prev.places.map((p) =>
+                    p.id === id && !p.isLocked
+                      ? {
+                          ...p,
+                          coordinates: undefined,
+                          locationSource: undefined,
+                          area: "Location unconfirmed",
+                        }
+                      : p,
+                  ),
+                }));
+              }}
+            />
+          ) : activeAgent ? (
             <>
               <AgentItem agent={activeAgent} onOpen={() => {}} />
               <p>
@@ -337,7 +415,7 @@ export default function App() {
               <p>
                 {trip.source === "demo"
                   ? "The sample rain scenario changes the afternoon visit while keeping the rest of your day together."
-                  : "The AI itinerary is generated from your city, interests and budget; weather is not connected."}
+                  : "The AI itinerary uses your city, date, interests and budget. When available, a daily forecast is supplied to the agents. Weather does not automatically replace stops or verify venue availability."}
               </p>
               {changed.map((p) => (
                 <div className="change-detail" key={p.id}>
@@ -430,6 +508,7 @@ export default function App() {
                               image: "/photos/garden.jpg",
                               coordinates: { lat: 35.6852, lng: 139.71 },
                               costUsd: 8,
+                              locationSource: undefined,
                               isChanged: false,
                             }
                           : p,

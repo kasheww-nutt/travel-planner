@@ -152,6 +152,7 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
             city: trip.city,
             interests: trip.interest.split("&").map((s) => s.trim()),
             budget: trip.budgetUsd,
+            date: trip.dateIso,
           }),
           signal,
         });

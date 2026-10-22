@@ -143,7 +143,7 @@ export default function RouteMap({
           <h3>Your route, all in one place.</h3>
           <p>
             {places.length
-              ? "These AI suggestions have no verified coordinates yet. Your itinerary remains available."
+              ? "Confirm venue matches in Places & forecast to add map pins. Your itinerary remains available."
               : "Plan a day to see your stops here."}
           </p>
         </div>
@@ -152,7 +152,8 @@ export default function RouteMap({
       {!!points.length && (
         <>
           <span className="map-caption">
-            Schematic route · approximate locations
+            Schematic line · {points.length}/{places.length} stops located · not
+            directions
           </span>
           <button className="transport-button" onClick={onTransport}>
             <TrainFront size={16} />

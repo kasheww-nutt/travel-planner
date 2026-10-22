@@ -7,6 +7,7 @@ from groq import BadRequestError
 from agents import Agent
 from message_bus import MessageBus
 from models import AgentMessage, Itinerary, ItineraryItem, UserInput
+from travel_data import CITIES, TravelDataUnavailable, travel_data
 
 SPECIALISTS = ["transport", "dining", "activities"]
 DEFAULT_SPLIT = {"transport": 0.20, "dining": 0.35, "activities": 0.45}
@@ -26,11 +27,29 @@ class Orchestrator:
         planner = self.agents["planner"]
         interests = ", ".join(user_input.interests) or "general sightseeing"
         budget = user_input.budget
+        context = f"Trip date: {user_input.date.isoformat()}. " if user_input.date else ""
+        if user_input.date and user_input.city in CITIES:
+            try:
+                forecast = await travel_data.weather(user_input.city, user_input.date)
+                if forecast["status"] == "available":
+                    context += (f"Open-Meteo city-wide daily forecast: {forecast['condition']}, "
+                                f"{forecast['temperature_2m_min']}–{forecast['temperature_2m_max']} °C, "
+                                f"maximum precipitation probability {forecast['precipitation_probability_max']}%. "
+                                "Consider indoor options if appropriate. Do not invent hourly weather or venue availability. ")
+                else:
+                    context += "Forecast unavailable for this date; do not claim known weather. "
+            except TravelDataUnavailable:
+                forecast = {"status": "unavailable", "message": "Weather provider unavailable; planning continues without a forecast."}
+                context += "Forecast unavailable; do not claim known weather. "
+            await self.bus.send(AgentMessage(
+                from_agent="system", to_agent="planner", message_type="status",
+                content=context, metadata={"weather": forecast, "date": user_input.date.isoformat()},
+            ))
 
         # Step 1 — Planner splits budget
         request = (
             f"Plan a full day in {user_input.city} with a total budget of ${budget:.2f} USD. "
-            f"Interests: {interests}."
+            f"Interests: {interests}. {context}"
         )
         await self.bus.send(AgentMessage(
             from_agent="user", to_agent="planner", message_type="task_assignment",
@@ -62,6 +81,7 @@ class Orchestrator:
                 "Suggest 3-5 activities for a single day between 08:00 and 22:00."
             ),
         }
+        tasks = {name: f"{task}\n{context}" for name, task in tasks.items()}
         for name in SPECIALISTS:
             await self.bus.send(AgentMessage(
                 from_agent="planner", to_agent=name, message_type="task_assignment",
@@ -145,6 +165,7 @@ class Orchestrator:
         return await planner.run(
             f"Assemble a chronological day itinerary for {user_input.city} from 08:00 to 22:00.\n"
             f"User budget: ${budget:.2f} USD. Interests: {interests}.\n\n"
+            f"Trip date: {user_input.date or 'unspecified'}. Times, prices and opening hours remain estimates.\n"
             f"TRANSPORT AGENT RESULT:\n{json.dumps(results['transport'])}\n\n"
             f"DINING AGENT RESULT:\n{json.dumps(results['dining'])}\n\n"
             f"ACTIVITIES AGENT RESULT:\n{json.dumps(results['activities'])}\n\n"

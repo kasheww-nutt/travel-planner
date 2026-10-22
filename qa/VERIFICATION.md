@@ -18,4 +18,13 @@ Additional browser checks passed: Explore shows five sample destination cards; R
 
 Final map check: all five numbered markers were confirmed not to intersect the weather overlay. Fit padding and per-stop label directions avoid hiding the northern stop under the weather panel.
 
-The selected calendar date is currently a frontend display setting; the legacy live API accepts city, interests and budget only. No opening-date or forecast validation is claimed. Live plans cannot preserve locked stops yet, and clearly refuse such a request rather than silently replacing them.
+At the original UI checkpoint, date was a frontend display setting. The travel-data phase below supersedes that limitation. Live plans still cannot preserve locked stops and refuse such a request rather than silently replacing them.
+
+## Travel-data phase
+
+- Strict TypeScript/production build passes; 24 backend regression tests pass. New tests cover date selection, historical/far-future dates, null forecast values, geocoder region/coordinate/source validation, empty results, provider caching/timeouts, bounded lookup capacity and release on error, endpoint errors, actual forecast context dispatched to all specialists, and successful planning when forecasts fail.
+- Live provider checks: Tokyo forecast for 2026-10-23 returned Overcast, 11.5–19 °C, 0% maximum daily precipitation probability. Tokyo Mori Art Museum search returned several real OSM candidates; the browser confirmed the intended museum and displayed its source/address. These are observed provider responses, not independent verification of meteorological accuracy or business operation.
+- Browser: historical sample date reports out of forecast range; native date input refreshes forecast; Use today in Japan selects the destination's day; locked-stop guidance appears; choosing a candidate updates its provenance and map state. Modal has source attribution and explicit limits.
+- Real Groq run for Kyoto on 2026-10-23 completed with all four agents done, 10 items and a displayed $76.25 estimate. The event log visibly included Open-Meteo Drizzle, 12.3–21.2 °C, 73% precipitation probability in assignments to all three specialists. This verifies integration only. The old engine still returns dubious/unverified transit products, venue suggestions, alternatives, and costs; it is not a validated travel itinerary.
+- Mobile panel at 390 × 844: content width 375, document width 375, dialog width 341.2; no horizontal overflow. Screenshots: `grounding-phase-desktop.png`, `grounding-phase-mobile.png`.
+- Live Kyoto lookup distinguished a similarly named **bus stop** from the temple's **place of worship** feature. After confirming the latter, the map showed one numbered pin and **1/10 stops located**, with the real daily forecast overlay. A deliberately unmatched search showed an empty result without adding coordinates. `grounding-phase-live-candidates.png` records the candidate types.

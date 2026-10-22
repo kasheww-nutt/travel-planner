@@ -1,9 +1,10 @@
-from datetime import datetime, timezone
+from datetime import date as TripDate, datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class UserInput(BaseModel):
+    date: TripDate | None = None
     city: str = Field(min_length=1, max_length=100)
     interests: list[str] = Field(default_factory=list, max_length=20)
     budget: float = Field(gt=0, le=1000000, allow_inf_nan=False)

@@ -23,7 +23,7 @@ export default function PlanUpdatePanel({
         </span>
         <span>
           <strong>
-            {trip.weather
+            {trip.source === "demo" && trip.weather
               ? "Rainy this afternoon"
               : changed
                 ? "A little change of plans"

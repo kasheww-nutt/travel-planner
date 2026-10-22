@@ -25,6 +25,12 @@ export interface Place {
   category: Category;
   image: string;
   coordinates?: GeoPoint;
+  locationSource?: {
+    name: string;
+    address: string;
+    url: string;
+    confirmedAt: string;
+  };
   costUsd: number;
   isChanged?: boolean;
   isLocked?: boolean;
@@ -50,6 +56,7 @@ export interface WeatherEvent {
   description: string;
   start: string;
   end: string;
+  source?: "Open-Meteo";
 }
 export interface Trip {
   city: string;

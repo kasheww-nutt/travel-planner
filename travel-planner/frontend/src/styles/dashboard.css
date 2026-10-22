@@ -1926,3 +1926,46 @@
     font-size: 11px;
   }
 }
+.travel-data-panel section + section {
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  padding-top: 24px;
+}
+.travel-data-panel h3 {
+  margin: 8px 0 14px;
+}
+.data-field {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+  font-weight: 500;
+  min-width: 0;
+}
+.data-field input,
+.data-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.location-candidate {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 14px 0;
+}
+.location-candidate p {
+  margin: 5px 0;
+}
+.location-candidate small {
+  display: block;
+  margin-bottom: 12px;
+}
+.travel-data-panel {
+  overflow-wrap: anywhere;
+}
+.run-toolbar {
+  flex-wrap: wrap;
+}

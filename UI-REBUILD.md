@@ -38,9 +38,9 @@ Open **http://127.0.0.1:5174**. The new frontend proxies `/api` to port **8002**
 
 The fixed Tokyo sample uses illustrative weather, prices, date, and approximate coordinate anchors. Its tea ceremony and restaurant are unnamed sample stops. The map connects coordinates schematically; it is not navigable directions or a live forecast.
 
-The current backend returns no verified coordinates or stop end times. Live plans therefore show location/duration unverified, neutral illustrations instead of inaccurate venue photos, and a readable itinerary rather than invented map points.
+The model returns no verified coordinates or stop end times. Live plans initially show location/duration unverified and neutral illustrations. In **Places & forecast**, search a specific venue, inspect its OpenStreetMap record, then confirm the intended match. Only confirmed matches get live map pins. This confirms the user's intended map location, not the venue's current operation, hours, prices or availability.
 
-Date navigation controls the displayed trip calendar date. The existing live model API consumes city, interests and budget; date-specific venue availability and opening hours are not connected.
+The live model API now consumes city, interests, budget and the selected calendar date. A real Open-Meteo daily forecast is supplied to the agents when available. Date-specific venue availability and opening hours are not connected. Changing the date refreshes the displayed forecast; generating again is required to update the itinerary.
 
 Live AI cannot yet preserve existing locked reservations. The UI blocks such a request and explains that the user must unlock the stops or use Demo replay. Demo replay preserves locked sample stops. The legacy planning engine's route feasibility, budget tolerance, grounded-data, and security audit findings are not comprehensively resolved by this UI rebuild. Keep the backend local.
 
@@ -56,3 +56,20 @@ cd ../backend
 ```
 
 See `qa/VERIFICATION.md` for observed browser results and screenshots. No deployment or push to the original GitHub repository is implied by this separate checkout.
+
+## Next phase: real travel data
+
+Implemented in this clone only:
+
+- **Places & forecast** opens a focused panel without crowding the workspace. Use its calendar or **Use today in Japan** to select a forecast date. The historical screenshot date intentionally reports no forecast rather than substituting today's weather.
+- Open-Meteo daily condition, temperature range and maximum daily precipitation probability for Tokyo, Kyoto or Osaka; today through 15 days ahead using Japan's calendar date. A city-wide daily forecast cannot establish a rain time at a venue.
+- The actual date and available forecast are included in planner and specialist task assignments visible in the message log. A provider failure or out-of-window date permits planning with an explicit unavailable-weather message, without fabricating a forecast.
+- Photon/OpenStreetMap venue search is restricted to a documented area around the selected city. No automatic best-match acceptance. Each candidate has its name, address, coordinates and OSM source link. Confirmation updates the corresponding stop's location and a **Map match confirmed** label; removal clears its pin. Locked stops cannot be changed. Searches that return nothing stay empty.
+- Partial maps report the number of located stops. Connecting lines are still schematic and may span unlocated intermediate stops; they are not road, walking or transit routes.
+- Lookup state is held in this page's memory. Refreshing or resetting restores the sample; there is no account or saved-trip database yet.
+
+Data access is backend-only, with fixed provider hosts, 8-second upstream timeouts, at most four pending lookups and one upstream request per second per provider, bounded in-memory caches (forecast 30 minutes; place searches 24 hours), input limits, coordinate validation and source attribution. No new API key is required for this local college POC. Search text and the city search area go to Photon; approximate city-centre coordinates go to Open-Meteo. No device location is collected. These public services are suitable for a modest non-commercial prototype; hosting at scale needs a provider/deployment review.
+
+Provider references: [Open-Meteo forecast](https://open-meteo.com/en/docs), [Photon API](https://github.com/komoot/photon/blob/master/docs/api-v1.md), [Photon public demo policy](https://github.com/komoot/photon), [OSM attribution](https://www.openstreetmap.org/copyright).
+
+Still pending: routed journey durations, grounded venue selection before generation, opening hours, real prices, persistence, lock-aware live replanning, and the previously recorded backend security hardening. A forecast-aware prompt alone does not prove a feasible itinerary.

@@ -3,11 +3,12 @@ import os
 import uuid
 import logging
 import time
+from datetime import date
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from groq import AsyncGroq
@@ -16,6 +17,7 @@ from agents import create_agents
 from message_bus import MessageBus
 from models import AgentMessage, UserInput
 from orchestrator import Orchestrator
+from travel_data import CITIES, TravelDataUnavailable, travel_data
 
 # .env lives at the project root (one level above backend/)
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -150,3 +152,25 @@ async def stream_events(session_id: str):
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/weather")
+async def weather(city: str, date: date):
+    if city not in CITIES:
+        raise HTTPException(422, "Choose Tokyo, Kyoto or Osaka.")
+    try:
+        return await travel_data.weather(city, date)
+    except TravelDataUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@app.get("/api/places/search")
+async def search_places(city: str, q: str = Query(min_length=2, max_length=150)):
+    if city not in CITIES:
+        raise HTTPException(422, "Choose Tokyo, Kyoto or Osaka.")
+    if len(q.strip()) < 2:
+        raise HTTPException(422, "Enter at least two characters.")
+    try:
+        return await travel_data.places(city, q)
+    except TravelDataUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
