@@ -79,11 +79,11 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(m.message_type == "revised_response" for m in bus.log))
         self.assertEqual(result["total_cost"], 70)
 
-    async def test_tolerance_boundary_does_not_revise(self):
+    async def test_any_overspend_triggers_revision(self):
         bus = MessageBus()
         result = json.loads(await Orchestrator(fixture(bus, activity_cost=70), bus).run(UserInput(city="Tokyo", budget=100)))
-        self.assertEqual(result["total_cost"], 110)
-        self.assertFalse(any(m.message_type == "revision_request" for m in bus.log))
+        self.assertLessEqual(result["total_cost"], 100)
+        self.assertTrue(any(m.message_type == "revision_request" for m in bus.log))
 
     async def test_planner_cannot_silently_drop_expenses(self):
         bus = MessageBus()
@@ -93,9 +93,10 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_revision_rounds_are_bounded(self):
         bus = MessageBus()
-        result = json.loads(await Orchestrator(fixture(bus, activity_cost=100, revised_cost=100), bus).run(UserInput(city="Tokyo", budget=100)))
+        with self.assertRaisesRegex(ValueError, "within the remaining budget"):
+            await Orchestrator(fixture(bus, activity_cost=100, revised_cost=100), bus).run(UserInput(city="Tokyo", budget=100))
         self.assertEqual(len([m for m in bus.log if m.message_type == "revision_request"]), 2)
-        self.assertEqual(result["total_cost"], 140)
+        self.assertFalse(any(m.message_type == "final_plan" for m in bus.log))
 
     async def test_bad_specialist_data_is_not_a_free_plan(self):
         bus = MessageBus()

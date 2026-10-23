@@ -64,6 +64,7 @@ export default function ItineraryPanel({
         </div>
         <button
           className="list-toggle"
+          aria-label={list ? "View timeline" : "View as list"}
           onClick={() => setList(!list)}
           aria-pressed={list}
         >

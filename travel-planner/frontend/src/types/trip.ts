@@ -34,6 +34,7 @@ export interface Place {
   costUsd: number;
   isChanged?: boolean;
   isLocked?: boolean;
+  isSample?: boolean;
 }
 export interface Agent {
   id: AgentId;

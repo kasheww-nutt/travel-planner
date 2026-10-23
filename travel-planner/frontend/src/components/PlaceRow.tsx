@@ -86,6 +86,7 @@ export default function PlaceRow({
             {place.name}
           </button>
           {place.isChanged && <Tag tone="peach">Changed</Tag>}
+          {place.isSample && <Tag>Sample stop</Tag>}
           {place.isLocked && (
             <Tag>
               <LockKeyhole size={11} />
@@ -94,6 +95,9 @@ export default function PlaceRow({
           )}
         </div>
         <p>{place.description}</p>
+        {place.isLocked && !place.end && (
+          <small>Locked start time · end time unset</small>
+        )}
         <div className="place-meta">
           <MapPin size={13} />
           <span>{place.area}</span>

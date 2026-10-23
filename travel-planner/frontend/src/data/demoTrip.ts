@@ -140,4 +140,10 @@ export const demoTrip: Trip = {
     },
   ],
 };
-export const newDemoTrip = (): Trip => structuredClone(demoTrip);
+export const newDemoTrip = (): Trip => ({
+  ...structuredClone(demoTrip),
+  places: structuredClone(demoTrip.places).map((p) => ({
+    ...p,
+    isSample: true,
+  })),
+});

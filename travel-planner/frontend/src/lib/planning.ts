@@ -23,6 +23,8 @@ export const eventSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 const itemSchema = z.object({
+  locked_id: z.string().min(1).nullable().optional(),
+  end_time: z.string().default(""),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   title: z.string().min(1),
   description: z.string().default(""),
@@ -103,8 +105,7 @@ export function applyAgentEvent(
       return {
         ...agent,
         status: (agent.status === "revising" ? "revising" : "working") as
-          | "working"
-          | "revising",
+          "working" | "revising",
         detail: event.content,
       };
     if (
@@ -128,12 +129,41 @@ export function applyAgentEvent(
     messages: [...trip.messages, readableEvent(event, index)],
   };
 }
-export function livePlaces(content: string): Place[] {
+export function livePlaces(content: string, previous: Place[] = []): Place[] {
   const plan = itinerarySchema.parse(JSON.parse(content));
+  const expected = previous.filter((p) => p.isLocked);
+  const returned = plan.items.filter((item) => item.locked_id);
+  if (
+    returned.length !== expected.length ||
+    expected.some(
+      (p) =>
+        returned.filter(
+          (item) =>
+            item.locked_id === p.id &&
+            item.title === p.name &&
+            item.time === p.start &&
+            item.end_time === p.end &&
+            item.cost === p.costUsd &&
+            item.description === p.description &&
+            item.category ===
+              (["dining", "lunch", "dinner"].includes(p.category)
+                ? "dining"
+                : p.category === "transport"
+                  ? "transport"
+                  : "activity"),
+        ).length !== 1,
+    )
+  )
+    throw new Error("The planner did not preserve your locked stops.");
   return plan.items.map((item, index) => {
+    if (item.locked_id) {
+      const original = expected.find((p) => p.id === item.locked_id);
+      if (!original) throw new Error("Unexpected locked stop.");
+      return { ...original, order: index + 1 };
+    }
     const dining = item.category === "dining";
     return {
-      id: `live-${index}`,
+      id: `live-${crypto.randomUUID()}`,
       order: index + 1,
       name: item.title,
       start: item.time,

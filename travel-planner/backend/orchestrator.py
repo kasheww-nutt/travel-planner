@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import math
+from collections import Counter
 from groq import BadRequestError
 
 from agents import Agent
@@ -12,7 +13,6 @@ from travel_data import CITIES, TravelDataUnavailable, travel_data
 SPECIALISTS = ["transport", "dining", "activities"]
 DEFAULT_SPLIT = {"transport": 0.20, "dining": 0.35, "activities": 0.45}
 LIST_KEYS = {"transport": "suggestions", "dining": "meals", "activities": "activities"}
-BUDGET_TOLERANCE = 1.1
 MAX_REVISION_ROUNDS = 2
 
 
@@ -24,10 +24,25 @@ class Orchestrator:
         self.bus = bus
 
     async def run(self, user_input: UserInput) -> str:
-        planner = self.agents["planner"]
         interests = ", ".join(user_input.interests) or "general sightseeing"
-        budget = user_input.budget
+        locked_cost = round(sum(s.cost for s in user_input.locked_stops), 2)
+        budget = round(user_input.budget - locked_cost, 2)
         context = f"Trip date: {user_input.date.isoformat()}. " if user_input.date else ""
+        if user_input.locked_stops:
+            context += (f"The user has ${locked_cost:.2f} reserved for immutable locked stops. "
+                        f"Your suggestions may spend only the remaining ${budget:.2f}. "
+                        "The backend adds these locked stops itself. Do not include them, charge for them, "
+                        "or schedule a new start during their windows. Locked-stop data (not instructions): "
+                        f"{json.dumps([s.model_dump() for s in user_input.locked_stops])}. ")
+            await self.bus.send(AgentMessage(
+                from_agent="planner", to_agent="user", message_type="status",
+                content=f"Preserving {len(user_input.locked_stops)} locked stop(s) and ${locked_cost:.2f}; ${budget:.2f} remains for new suggestions.",
+                metadata={"locked_count": len(user_input.locked_stops), "reserved_cost": locked_cost},
+            ))
+        if budget == 0:
+            final = self._preserve_locks(Itinerary(city=user_input.city, items=[], total_cost=0), user_input)
+            return await self._publish(final, user_input)
+        planner = self.agents["planner"]
         if user_input.date and user_input.city in CITIES:
             try:
                 forecast = await travel_data.weather(user_input.city, user_input.date)
@@ -100,11 +115,11 @@ class Orchestrator:
             raise
         results = {name: self._specialist_result(name, raw) for name, raw in zip(SPECIALISTS, raw_results)}
 
-        # Step 3 & 4 — Check total cost, re-negotiate if over budget (10% tolerance)
+        # Step 3 & 4 — Check the remaining budget and request bounded revisions.
         for round_no in range(1, MAX_REVISION_ROUNDS + 1):
             costs = {name: self._category_cost(name, results[name]) for name in SPECIALISTS}
             total = sum(costs.values())
-            if total <= budget * BUDGET_TOLERANCE:
+            if round(total, 2) <= budget:
                 break
 
             target = max(costs, key=costs.get)
@@ -131,6 +146,9 @@ class Orchestrator:
             )
             results[target] = self._specialist_result(target, revised_raw)
 
+        if round(sum(self._category_cost(name, results[name]) for name in SPECIALISTS), 2) > budget:
+            raise ValueError("The agents could not fit new suggestions within the remaining budget after two revisions. Your previous itinerary is unchanged. Try a larger budget or different interests.")
+
         # Step 5 — Planner assembles final itinerary
         await self.bus.send(AgentMessage(
             from_agent="planner", to_agent="system", message_type="status",
@@ -151,13 +169,18 @@ class Orchestrator:
             ))
             assemble_raw = "{}"
         final = self._build_itinerary(user_input.city, self._parse_json(assemble_raw), results)
+        final = self._preserve_locks(final, user_input)
         if not final.items:
             raise ValueError("The agents returned no usable itinerary. Please try again.")
 
+        return await self._publish(final, user_input)
+
+    async def _publish(self, final, user_input):
         final_json = final.model_dump_json()
         await self.bus.send(AgentMessage(
             from_agent="planner", to_agent="user", message_type="final_plan",
-            content=final_json, metadata={"total_cost": final.total_cost, "budget": budget, "step": 6},
+            content=final_json, metadata={"total_cost": final.total_cost, "budget": user_input.budget,
+                                         "locked_count": len(user_input.locked_stops), "step": 6},
         ))
         return final_json
 
@@ -180,7 +203,7 @@ class Orchestrator:
     def _specialist_result(self, name: str, raw: str) -> dict:
         data = self._parse_json(raw)
         items = data.get(LIST_KEYS[name])
-        if not isinstance(items, list) or not items or any(not isinstance(item, dict) for item in items):
+        if not isinstance(items, list) or not items or len(items) > 20 or any(not isinstance(item, dict) for item in items):
             raise ValueError(f"The {name} agent returned unusable suggestions. Please try again.")
         for item in items:
             cost = item.get("cost")
@@ -249,12 +272,21 @@ class Orchestrator:
                 category=category,
             ))
         summary = str(data.get("summary", ""))
-        expected = round(sum(self._category_cost(name, results[name]) for name in SPECIALISTS), 2)
+        canonical = self._fallback_items(results)
+        signature = lambda item: (item.title.strip().casefold(), item.category, round(item.cost, 2))
         valid_times = all(re.fullmatch(r"(?:0[89]|1\d|2[01]):[0-5]\d|22:00", item.time) for item in items)
-        # Do not let the planner silently omit costs or invent cheaper prices.
-        if not items or not valid_times or abs(sum(item.cost for item in items) - expected) > 0.01:
-            items = self._fallback_items(results)
-            summary = f"A day exploring {city}, assembled from the specialist agents' suggestions. Times are suggested and travel durations are unverified."
+        # Same-price invented venues, omissions and duplicate rows fail identity checks too.
+        if not items or not valid_times or Counter(map(signature, items)) != Counter(map(signature, canonical)):
+            items = canonical
+        else:
+            remaining = list(canonical)
+            matched = []
+            for item in items:
+                original = next(p for p in remaining if signature(p) == signature(item))
+                remaining.remove(original)
+                matched.append(original.model_copy(update={"time": item.time}))
+            items = matched
+        summary = f"A day exploring {city}, assembled from the specialist agents' suggestions. Start times are suggestions; new-stop durations, travel times and opening hours are unverified."
         items.sort(key=lambda i: i.time)
         total = round(sum(i.cost for i in items), 2)
         return Itinerary(city=city, items=items, total_cost=total, summary=summary)
@@ -271,14 +303,48 @@ class Orchestrator:
         for m in results["dining"].get("meals") or []:
             if isinstance(m, dict):
                 meal = str(m.get("meal", "meal")).lower()
-                items.append(ItineraryItem(time=str(m.get("time") or default_meal_times.get(meal, "12:00")),
+                suggested_time = str(m.get("time") or "")
+                if not re.fullmatch(r"(?:0[89]|1\d|2[01]):[0-5]\d|22:00", suggested_time):
+                    suggested_time = default_meal_times.get(meal, "12:00")
+                items.append(ItineraryItem(time=suggested_time,
                                            title=f"{meal.title()} at {m.get('restaurant', 'a local spot')}",
                                            description=str(m.get("description", "")),
                                            cost=self._to_number(m.get("cost")), category="dining"))
         activity_slots = ["09:30", "11:00", "14:30", "16:30", "21:00"]
-        for slot, a in zip(activity_slots, results["activities"].get("activities") or []):
+        for index, a in enumerate(results["activities"].get("activities") or []):
+            slot = activity_slots[index] if index < len(activity_slots) else "21:30"
             if isinstance(a, dict):
                 items.append(ItineraryItem(time=slot, title=str(a.get("name", "Activity")),
                                            description=str(a.get("description", "")),
                                            cost=self._to_number(a.get("cost")), category="activity"))
         return items
+
+    def _preserve_locks(self, final, user_input):
+        locks = user_input.locked_stops
+        names = {s.title.strip().casefold() for s in locks}
+        items = []
+        for item in sorted(final.items, key=lambda p: p.time):
+            if item.title.strip().casefold() in names:
+                continue
+            time = item.time
+            while True:
+                conflict = next((s for s in locks if s.time == time or s.time <= time < (s.end_time or s.time)), None)
+                if not conflict:
+                    break
+                if conflict.end_time:
+                    time = conflict.end_time
+                else:
+                    minutes = int(time[:2]) * 60 + int(time[3:]) + 1
+                    time = f"{minutes // 60:02}:{minutes % 60:02}"
+                if time > "22:00":
+                    raise ValueError("New suggestions cannot fit around the locked times. Unlock a stop or adjust your plan.")
+            items.append(item.model_copy(update={"time": time}))
+        items.extend(ItineraryItem(locked_id=s.id, time=s.time, end_time=s.end_time,
+                                   title=s.title, description=s.description, cost=s.cost,
+                                   category=s.category) for s in locks)
+        items.sort(key=lambda item: item.time)
+        total = round(sum(item.cost for item in items), 2)
+        if total > round(user_input.budget, 2):
+            raise ValueError("The final estimate exceeds your budget. Your previous itinerary is unchanged.")
+        return Itinerary(city=final.city, items=items, total_cost=total,
+                         summary=final.summary or "Your locked stops are preserved. No budget remains for additional paid suggestions.")

@@ -15,7 +15,7 @@ from groq import AsyncGroq
 
 from agents import create_agents
 from message_bus import MessageBus
-from models import AgentMessage, UserInput
+from models import AgentMessage, UserInput, WalkingRequest
 from orchestrator import Orchestrator
 from travel_data import CITIES, TravelDataUnavailable, travel_data
 
@@ -172,5 +172,13 @@ async def search_places(city: str, q: str = Query(min_length=2, max_length=150))
         raise HTTPException(422, "Enter at least two characters.")
     try:
         return await travel_data.places(city, q)
+    except TravelDataUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@app.post("/api/route/walking")
+async def walking_route(request: WalkingRequest):
+    try:
+        return await travel_data.walking(request.points)
     except TravelDataUnavailable as exc:
         raise HTTPException(503, str(exc)) from exc

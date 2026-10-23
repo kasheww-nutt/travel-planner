@@ -1969,3 +1969,21 @@
 .run-toolbar {
   flex-wrap: wrap;
 }
+.saved-trip-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.import-trip {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 0;
+}
+.import-trip input {
+  max-width: 100%;
+}
+.saved-trips-panel {
+  overflow-wrap: anywhere;
+}

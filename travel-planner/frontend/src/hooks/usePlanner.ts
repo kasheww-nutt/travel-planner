@@ -15,24 +15,37 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
   const controller = useRef<AbortController | null>(null);
   const source = useRef<EventSource | null>(null);
   const session = useRef<string | null>(null);
+  const baseline = useRef<Trip | null>(null);
+  const active = useRef(false);
   useEffect(
     () => () => {
+      const id = session.current;
       controller.current?.abort();
       source.current?.close();
+      if (id)
+        void fetch(`/api/plan/${id}`, {
+          method: "DELETE",
+          keepalive: true,
+        }).catch(() => {});
     },
     [],
   );
   const cancel = () => {
+    const id = session.current;
     controller.current?.abort();
     source.current?.close();
-    if (session.current)
-      void fetch(`/api/plan/${session.current}`, { method: "DELETE" }).catch(
-        () => {},
-      );
+    if (id) void fetch(`/api/plan/${id}`, { method: "DELETE" }).catch(() => {});
     session.current = null;
     setBusy(false);
     setTrip((prev) => ({
       ...prev,
+      ...(baseline.current
+        ? {
+            source: baseline.current.source,
+            places: baseline.current.places,
+            weather: baseline.current.weather,
+          }
+        : {}),
       agents: prev.agents.map((a) =>
         ["working", "revising"].includes(a.status)
           ? { ...a, status: "idle", detail: "Planning cancelled" }
@@ -42,6 +55,7 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
     setError("Planning cancelled. Your last itinerary is still here.");
   };
   async function plan(trip: Trip, mode: "demo" | "live") {
+    if (active.current) return;
     setError("");
     if (mode === "demo" && trip.city !== "Tokyo") {
       setError(
@@ -49,13 +63,20 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
       );
       return;
     }
-    if (mode === "live" && trip.places.some((p) => p.isLocked)) {
+    if (
+      mode === "live" &&
+      trip.places
+        .filter((p) => p.isLocked)
+        .reduce((sum, p) => sum + p.costUsd, 0) > trip.budgetUsd
+    ) {
       setError(
-        "Live generation cannot yet preserve existing reservations. Unlock your stops first, or use Demo replay to preserve them.",
+        "Locked stops exceed your budget. Increase the budget or unlock a stop.",
       );
       return;
     }
     setBusy(true);
+    active.current = true;
+    baseline.current = trip;
     controller.current = new AbortController();
     const signal = controller.current.signal;
     setTrip((prev) => ({
@@ -153,6 +174,21 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
             interests: trip.interest.split("&").map((s) => s.trim()),
             budget: trip.budgetUsd,
             date: trip.dateIso,
+            locked_stops: trip.places
+              .filter((p) => p.isLocked)
+              .map((p) => ({
+                id: p.id,
+                title: p.name,
+                time: p.start,
+                end_time: p.end,
+                description: p.description,
+                cost: p.costUsd,
+                category: ["dining", "lunch", "dinner"].includes(p.category)
+                  ? "dining"
+                  : p.category === "transport"
+                    ? "transport"
+                    : "activity",
+              })),
           }),
           signal,
         });
@@ -161,14 +197,27 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
           throw new Error(
             typeof data.detail === "string"
               ? data.detail
-              : "The planner could not start. Please try again.",
+              : Array.isArray(data.detail)
+                ? data.detail
+                    .map(
+                      (d: { msg?: string }) => d.msg || "Invalid trip options",
+                    )
+                    .join(". ")
+                : "The planner could not start. Please try again.",
           );
         if (typeof data.session_id !== "string")
           throw new Error("The planner returned an invalid session.");
         session.current = data.session_id;
+        if (signal.aborted) {
+          void fetch(`/api/plan/${data.session_id}`, {
+            method: "DELETE",
+          }).catch(() => {});
+          throw new DOMException("Aborted", "AbortError");
+        }
         await new Promise<void>((resolve, reject) => {
           let count = 0;
           const events = new EventSource(`/api/stream/${data.session_id}`);
+          let settled = false;
           source.current = events;
           const timer = setTimeout(
             () =>
@@ -176,6 +225,12 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
             190000,
           );
           const finish = (error?: Error) => {
+            if (settled) return;
+            settled = true;
+            if (error && error.name !== "AbortError")
+              void fetch(`/api/plan/${data.session_id}`, {
+                method: "DELETE",
+              }).catch(() => {});
             clearTimeout(timer);
             events.close();
             source.current = null;
@@ -188,15 +243,17 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
             { once: true },
           );
           events.onmessage = (message) => {
+            if (signal.aborted || settled) return;
             try {
               const event = eventSchema.parse(JSON.parse(message.data));
               setTrip((prev) => applyAgentEvent(prev, event, count++));
               if (event.message_type === "error")
                 finish(new Error(event.content));
               else if (event.message_type === "final_plan") {
-                const places = livePlaces(event.content);
+                const places = livePlaces(event.content, trip.places);
                 setTrip((prev) => ({
                   ...prev,
+                  source: "live",
                   places,
                   estimatedUsd: places.reduce((sum, p) => sum + p.costUsd, 0),
                   weather: null,
@@ -220,6 +277,13 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
         });
       }
     } catch (err) {
+      if (!signal.aborted)
+        setTrip((prev) => ({
+          ...prev,
+          source: trip.source,
+          places: trip.places,
+          weather: trip.weather,
+        }));
       if (err instanceof Error && err.name !== "AbortError") {
         setError(err.message);
         setTrip((prev) => ({
@@ -232,6 +296,7 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
         }));
       }
     } finally {
+      active.current = false;
       setBusy(false);
     }
   }

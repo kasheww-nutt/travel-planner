@@ -39,7 +39,7 @@ def weather_label(code):
 class TravelData:
     def __init__(self):
         self.cache = {}
-        self.locks = {name: asyncio.Lock() for name in ("weather", "places")}
+        self.locks = {name: asyncio.Lock() for name in ("weather", "places", "walking")}
         self.last_request = {name: 0.0 for name in self.locks}
         self.pending = {name: 0 for name in self.locks}
 
@@ -53,7 +53,7 @@ class TravelData:
             self.pending[provider] -= 1
 
     async def _load_json(self, provider, url, params, ttl):
-        key = (provider, tuple(sorted(params.items())))
+        key = (provider, url, tuple(sorted(params.items())))
         async with self.locks[provider]:
             now = time.monotonic()
             self.cache = {k: v for k, v in self.cache.items() if v[0] > now}
@@ -144,6 +144,36 @@ class TravelData:
         return {"city": city, "query": query.strip(), "candidates": candidates,
                 "source": "OpenStreetMap via Photon", "fetched_at": raw["_retrieved_at"],
                 "message": "Search matches require your confirmation. Names, opening hours and availability may be outdated."}
+
+    async def walking(self, points):
+        coordinates = ";".join(f"{p.lng:.7f},{p.lat:.7f}" for p in points)
+        # This dedicated server runs FOSSGIS's foot profile, never the car profile.
+        raw = await self._json("walking", f"https://routing.openstreetmap.de/routed-foot/route/v1/foot/{coordinates}", {
+            "overview": "simplified", "geometries": "geojson", "steps": "false", "alternatives": "false",
+        }, 3600)
+        try:
+            if raw.get("code") != "Ok":
+                raise ValueError("No walking route")
+            route = raw["routes"][0]
+            waypoints = raw["waypoints"]
+            if len(waypoints) != 2 or any(isinstance(p["distance"], bool) or not isinstance(p["distance"], (int, float)) or not 0 <= p["distance"] <= 300 for p in waypoints):
+                raise ValueError("Map locations are too far from the walking network")
+            duration, distance = route["duration"], route["distance"]
+            if any(isinstance(v, bool) or not isinstance(v, (float, int)) or not math.isfinite(v) or v < 0 for v in (duration, distance)):
+                raise ValueError("Invalid distance or duration")
+            geometry = route["geometry"]
+            if geometry["type"] != "LineString" or not 2 <= len(geometry["coordinates"]) <= 5000:
+                raise ValueError("Invalid geometry")
+            path = []
+            for lng, lat in geometry["coordinates"]:
+                if any(isinstance(v, bool) or not isinstance(v, (float, int)) or not math.isfinite(v) for v in (lng, lat)) or not -90 <= lat <= 90 or not -180 <= lng <= 180:
+                    raise ValueError("Invalid coordinate")
+                path.append([lat, lng])
+        except (KeyError, TypeError, IndexError, ValueError) as exc:
+            raise TravelDataUnavailable("No usable walking route found. Check the place matches or try again later.") from exc
+        return {"source": "FOSSGIS / OSRM", "mode": "walking", "distance_m": distance,
+                "duration_s": duration, "path": path, "fetched_at": raw["_retrieved_at"],
+                "source_url": "https://routing.openstreetmap.de/about.html"}
 
 
 travel_data = TravelData()

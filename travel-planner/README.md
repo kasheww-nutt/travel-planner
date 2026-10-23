@@ -54,7 +54,7 @@ flowchart LR
 ```
 
 - **Communication:** Every assignment, status, response, revision, error, and final plan passes through the per-session MessageBus. The SSE endpoint replays earlier messages before streaming new ones, so a late browser connection misses no events.
-- **Orchestration:** The planner splits the budget. Three specialists execute concurrently using `asyncio.gather()`. If costs exceed 110% of the budget, the orchestrator requests cheaper alternatives from the most expensive specialist, for at most two revision rounds.
+- **Orchestration:** Locked costs are reserved first. Three specialists execute concurrently using `asyncio.gather()`. Any overspend against the remaining estimate budget requests cheaper alternatives for at most two rounds. Unresolved overspend fails without replacing the old itinerary. Locked stops are restored exactly outside the model; final assembly cannot invent equal-cost replacement stops.
 - **Agents:** Four prompt-specific agents share an `AsyncGroq` client and use `GROQ_MODEL` (default `openai/gpt-oss-20b`) with JSON object mode. The original `llama-3.1-8b-instant` returned `model_not_found` during live verification with the configured account. Planner budget parsing has a deterministic fallback; unusable specialist results terminate with an explicit error. Costs are calculated from line items rather than trusting the final model's declared total.
 - **Presentation:** The team panel shows idle, thinking, done, revising, and interrupted states. All messages are expandable in the log. The final timeline includes the calculated total and a visible warning if it exceeds the requested budget.
 - **Real data:** The selected date and available Open-Meteo daily forecast are included in agent assignments. **Places & forecast** searches Photon/OSM and lets the user confirm intended venue locations before live pins are added. Matches verify neither opening hours nor prices; map lines remain schematic. See [phase details and limits](../UI-REBUILD.md#next-phase-real-travel-data).
@@ -71,6 +71,7 @@ The one-second pre-call pause supports demo pacing; it cannot guarantee complian
 | `DELETE /api/plan/{session_id}` | Cancels active planning |
 | `GET /api/weather?city=Tokyo&date=YYYY-MM-DD` | Daily forecast or explicit out-of-range state; provider errors return 503 |
 | `GET /api/places/search?city=Tokyo&q=Mori%20Art%20Museum` | Up to five OSM candidate features; requires user confirmation |
+| `POST /api/route/walking` | `{city, points: [{lat,lng},{lat,lng}]}` returns a FOSSGIS/OSRM foot route or explicit unavailable error |
 
 Sessions are local to one process. Finished sessions remain replayable for one hour and are removed when a new plan starts; storage is capped at 100 sessions. Run one backend worker. Restarting clears all sessions. This demo has no authentication and should be run locally.
 
@@ -85,10 +86,10 @@ cd ../frontend
 npm run build
 ```
 
-The offline tests use fake model responses to exercise actual orchestration, parallel execution, assignment ordering, the 10% budget threshold, revision rounds, malformed outputs, SSE replay, subscriber cleanup, validation, and provider errors. They do not call Groq. Live inference requires your own key and provider availability.
+The offline tests use fake model responses to exercise orchestration, locks, strict budget checks, revision rounds, malformed outputs, SSE replay, subscriber cleanup, provider data and walking geometry validation. They do not call Groq. Run `npm test` in the frontend (Node 22.18+; verified on Node 24) for persistence/import and locked-result checks. Live inference requires your own key and provider availability.
 
 ## Demo limitations
 
-Suggestions, prices, opening times, and travel feasibility remain model estimates. Daily weather is sourced from Open-Meteo and optionally included in generation; OSM place matches are looked up after generation and require the user's confirmation. Neither integration verifies the plan's feasibility or current venue operations. All prices are USD estimates. The 10% tolerance and bounded revisions mean the app cannot guarantee a plan within the exact requested budget; it reports remaining overspend openly. If the planner's timeline is unusable or changes the specialists' total, a deterministic schedule uses their original line items; its times are suggestions and do not account for travel durations.
+Suggestions, prices, opening times, and whole-day travel feasibility remain model estimates. Daily weather is sourced from Open-Meteo; OSM place matches require user confirmation. An explicit walking lookup routes a selected pair of confirmed coordinates, not the entire itinerary. All prices are USD estimates; a plan that still exceeds the estimate budget after revisions is rejected. Locked starts/windows are preserved, while new-stop durations and transfer feasibility remain unverified. Current trips and ten named copies save locally; export a JSON file for a portable backup. Browser storage is not an account or cloud backup.
 
 The brief's “16 files” target does not match its listed tree. The implementation follows that tree and additionally includes a safe environment template, ignore rules, dependency lockfile, and regression tests. Real credentials and generated dependencies are excluded from Git.

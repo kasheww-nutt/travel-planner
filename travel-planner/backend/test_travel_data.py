@@ -8,7 +8,8 @@ import httpx
 from fastapi.testclient import TestClient
 
 import main
-from models import UserInput
+from models import UserInput, GeoPoint, WalkingRequest
+from pydantic import ValidationError
 from message_bus import MessageBus
 from orchestrator import Orchestrator
 from test_workflow import fixture
@@ -20,6 +21,31 @@ def today_japan():
 
 
 class TravelDataTests(unittest.IsolatedAsyncioTestCase):
+    async def test_walking_response_uses_foot_geometry_and_validates_snaps(self):
+        service=TravelData()
+        points=[GeoPoint(lat=35.7148,lng=139.7967),GeoPoint(lat=35.6655,lng=139.7707)]
+        raw={"code":"Ok","_retrieved_at":"now","waypoints":[{"distance":2},{"distance":3}],"routes":[{"duration":500,"distance":600,"geometry":{"type":"LineString","coordinates":[[139.7967,35.7148],[139.7707,35.6655]]}}]}
+        with patch.object(service,"_json",new_callable=AsyncMock,return_value=raw) as provider:
+            result=await service.walking(points)
+            self.assertIn("/routed-foot/route/v1/foot/",provider.call_args.args[1])
+            self.assertEqual(result["path"][0],[35.7148,139.7967])
+            self.assertEqual(result["mode"],"walking")
+            raw["waypoints"][0]["distance"]=301
+            with self.assertRaises(TravelDataUnavailable):await service.walking(points)
+            raw["waypoints"][0]["distance"]=0
+            raw["routes"][0]["duration"]=float("nan")
+            with self.assertRaises(TravelDataUnavailable):await service.walking(points)
+            raw["code"]="NoRoute"
+            with self.assertRaises(TravelDataUnavailable):await service.walking(points)
+
+    async def test_cache_does_not_reuse_geometry_for_another_pair(self):
+        service=TravelData()
+        response=httpx.Response(200,json={"code":"Ok"},request=httpx.Request("GET","https://routing.openstreetmap.de/"))
+        with patch("travel_data.httpx.AsyncClient.get",new_callable=AsyncMock,return_value=response) as get,patch("travel_data.asyncio.sleep",new_callable=AsyncMock):
+            await service._json("walking","https://routing.openstreetmap.de/pair-one",{},3600)
+            await service._json("walking","https://routing.openstreetmap.de/pair-two",{},3600)
+            await service._json("walking","https://routing.openstreetmap.de/pair-one",{},3600)
+            self.assertEqual(get.await_count,2)
     async def test_lookup_capacity_is_bounded(self):
         service = TravelData()
         service.pending["places"] = 4
@@ -115,6 +141,10 @@ class TravelDataTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DataApiTests(unittest.TestCase):
+    def test_walking_input_rejects_out_of_city_and_identical_points(self):
+        for points in [[{"lat":0,"lng":0},{"lat":35.7,"lng":139.7}],[{"lat":35.7,"lng":139.7}]*2,[{"lat":35.7,"lng":139.7}]]:
+            with self.assertRaises(ValidationError):WalkingRequest(city="Tokyo",points=points)
+
     def test_input_validation_and_upstream_failure(self):
         with TestClient(main.app) as client:
             self.assertEqual(client.get("/api/weather", params={"city": "Tokyo", "date": "invalid"}).status_code, 422)

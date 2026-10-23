@@ -5,13 +5,16 @@ import type { Place, WeatherEvent } from "../types/trip";
 import MapMarker from "./MapMarker";
 import WeatherAlert from "./WeatherAlert";
 import "leaflet/dist/leaflet.css";
+import type { WalkingRoute } from "../lib/routing";
 
 function Controls({
   places,
   selectedId,
+  routePath,
 }: {
   places: Place[];
   selectedId: string | null;
+  routePath?: [number, number][];
 }) {
   const map = useMap();
   const fit = () => {
@@ -20,6 +23,7 @@ function Controls({
         ? [[p.coordinates.lat, p.coordinates.lng] as [number, number]]
         : [],
     );
+    if (routePath) points.push(...routePath);
     if (points.length)
       map.fitBounds(points, {
         paddingTopLeft: [55, 115],
@@ -42,7 +46,7 @@ function Controls({
       clearTimeout(timer);
       observer.disconnect();
     };
-  }, [places, map]);
+  }, [places, map, routePath]);
   useEffect(() => {
     const p = places.find((p) => p.id === selectedId);
     if (p?.coordinates)
@@ -63,6 +67,7 @@ function Controls({
   );
 }
 export default function RouteMap({
+  walkingRoute,
   places,
   weather,
   selectedId,
@@ -70,6 +75,7 @@ export default function RouteMap({
   onWeather,
   onTransport,
 }: {
+  walkingRoute?: WalkingRoute;
   places: Place[];
   weather: WeatherEvent | null;
   selectedId: string | null;
@@ -109,6 +115,12 @@ export default function RouteMap({
             positions={points}
             pathOptions={{ color: "#214d3b", weight: 3, opacity: 0.9 }}
           />
+          {walkingRoute && (
+            <Polyline
+              positions={walkingRoute.path}
+              pathOptions={{ color: "#2b6fbd", weight: 5, opacity: 0.95 }}
+            />
+          )}
           {places.map((place, i) =>
             place.isChanged &&
             i > 0 &&
@@ -135,7 +147,11 @@ export default function RouteMap({
               onSelect={() => onSelect(place.id)}
             />
           ))}
-          <Controls places={places} selectedId={selectedId} />
+          <Controls
+            places={places}
+            selectedId={selectedId}
+            routePath={walkingRoute?.path}
+          />
         </MapContainer>
       ) : (
         <div className="empty-state">
@@ -152,15 +168,15 @@ export default function RouteMap({
       {!!points.length && (
         <>
           <span className="map-caption">
-            Schematic line · {points.length}/{places.length} stops located · not
-            directions
+            {walkingRoute
+              ? `Blue: walking ${Math.ceil(walkingRoute.duration_s / 60)} min · other lines schematic`
+              : `Schematic line · ${points.length}/${places.length} stops located · not directions`}
           </span>
-          <button className="transport-button" onClick={onTransport}>
-            <TrainFront size={16} />
-            View transport options
-          </button>
         </>
       )}
+      <button className="transport-button" onClick={onTransport}>
+        <TrainFront size={16} /> View transport options
+      </button>
       {tilesFailed && (
         <div className="tile-warning" role="status">
           Map tiles unavailable. All stops are listed in your itinerary.

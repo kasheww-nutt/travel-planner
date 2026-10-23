@@ -24,16 +24,39 @@ import credits from "./data/photoCredits.json";
 import usePlanner from "./hooks/usePlanner";
 import useForecast from "./hooks/useForecast";
 import TravelDataPanel from "./components/TravelDataPanel";
+import SavedTripsPanel from "./components/SavedTripsPanel";
+import WalkingRoutePanel from "./components/WalkingRoutePanel";
+import { tripRouteKey, type WalkingRoute } from "./lib/routing";
+import { readCurrent, writeCurrent } from "./lib/storage";
 import type { Trip, Tab } from "./types/trip";
 import { money } from "./types/trip";
 
 export default function App() {
-  const [trip, setTrip] = useState<Trip>(newDemoTrip);
+  const [trip, setTrip] = useState<Trip>(() => {
+    try {
+      return readCurrent(localStorage) || newDemoTrip();
+    } catch {
+      return newDemoTrip();
+    }
+  });
+  const [saveStatus, setSaveStatus] = useState("");
+  const [walkingRoute, setWalkingRoute] = useState<WalkingRoute | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("Workspace");
-  const [mode, setMode] = useState<"demo" | "live">("demo");
+  const [mode, setMode] = useState<"demo" | "live">(trip.source);
   const [dialog, setDialog] = useState<string | null>(null);
   const { busy, error, plan, cancel, setError } = usePlanner(setTrip);
+  useEffect(() => {
+    if (busy) return;
+    try {
+      writeCurrent(localStorage, trip);
+      setSaveStatus("Saved on this device");
+    } catch {
+      setSaveStatus(
+        "Automatic save unavailable — export a trip file to keep your changes",
+      );
+    }
+  }, [trip, busy]);
   const forecast = useForecast(
     trip.city,
     trip.dateIso,
@@ -152,6 +175,7 @@ export default function App() {
           <button onClick={() => setDialog("travel-data")}>
             <MapPin size={12} /> Places & forecast
           </button>
+          <button onClick={() => setDialog("saved-trips")}>Saved trips</button>
         </div>
         {error && (
           <div className="error-banner" role="alert">
@@ -218,6 +242,11 @@ export default function App() {
             )}
             <div className="right-column">
               <RouteMap
+                walkingRoute={
+                  walkingRoute?.key === tripRouteKey(trip)
+                    ? walkingRoute
+                    : undefined
+                }
                 places={
                   trip.source === "live"
                     ? trip.places.map((p) => ({
@@ -247,6 +276,11 @@ export default function App() {
           </div>
         )}
         <footer className="page-footer">
+          <span role="status">
+            {busy
+              ? "Planning · previous itinerary kept until completion"
+              : saveStatus}
+          </span>
           <span>
             <Info size={12} />
             {trip.source === "demo"
@@ -273,11 +307,24 @@ export default function App() {
                     about: "Your travel workspace",
                     credits: "Photography & map credits",
                     "travel-data": "Places & forecast",
+                    "saved-trips": "Your saved trips",
                   }[dialog] || "A place worth exploring"
           }
           onClose={() => setDialog(null)}
         >
-          {dialog === "travel-data" ? (
+          {dialog === "saved-trips" ? (
+            <SavedTripsPanel
+              trip={trip}
+              busy={busy}
+              onLoad={(loaded) => {
+                setTrip(loaded);
+                setMode(loaded.source);
+                setSelectedId(null);
+                setError("");
+                setDialog(null);
+              }}
+            />
+          ) : dialog === "travel-data" ? (
             <TravelDataPanel
               trip={trip}
               busy={busy}
@@ -379,6 +426,7 @@ export default function App() {
             </>
           ) : dialog === "transport" ? (
             <>
+              <WalkingRoutePanel trip={trip} onRoute={setWalkingRoute} />
               <div className="notice">
                 <MapPin size={20} />
                 This line connects approximate stops; it is not turn-by-turn
@@ -407,7 +455,9 @@ export default function App() {
               ))}
               <p>
                 Check metro connections and walking durations before you travel.
-                No live routing service is connected.
+                A blue walking route, when requested, covers only your selected
+                confirmed pair. Transit services and other legs remain
+                unverified.
               </p>
             </>
           ) : dialog === "changes" ? (
@@ -429,8 +479,9 @@ export default function App() {
               <p>
                 <LockKeyhole size={15} />{" "}
                 {trip.places.filter((p) => p.isLocked).length} stop(s) locked.
-                Demo replay preserves these selections. Live AI requires
-                unlocking first.
+                Both modes preserve locked stops. Live AI reserves their costs
+                and start/end windows on the backend. New-stop durations and
+                travel times remain unverified.
               </p>
             </>
           ) : dialog === "about" ? (
@@ -490,7 +541,7 @@ export default function App() {
               <p>
                 {trip.source === "demo" && replacePlace.id === "mori"
                   ? "Choose the afternoon that suits you. Locked stops will remain untouched."
-                  : "Choose a fresh plan to get new suggestions. Existing locked stops are preserved in Demo replay only."}
+                  : "Choose a fresh plan to get new suggestions around your locked stops."}
               </p>
               {trip.source === "demo" && replacePlace.id === "mori" ? (
                 <button
