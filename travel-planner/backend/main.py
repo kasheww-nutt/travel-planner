@@ -16,7 +16,7 @@ from groq import AsyncGroq
 from agents import create_agents
 from message_bus import MessageBus
 from models import AgentMessage, UserInput, WalkingRequest
-from orchestrator import Orchestrator
+from grounded_planner import GroundedOrchestrator as Orchestrator
 from travel_data import CITIES, TravelDataUnavailable, travel_data
 
 # .env lives at the project root (one level above backend/)

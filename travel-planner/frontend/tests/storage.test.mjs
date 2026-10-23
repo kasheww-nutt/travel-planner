@@ -135,3 +135,40 @@ test("walking route state invalidates when a matched location changes", () => {
     }),
   );
 });
+test("source-backed venues carry listed hours through conversion and storage", () => {
+  const venue = {
+    id: "node/123",
+    name: "Synthetic fixture museum",
+    kind: "museum",
+    address: "Tokyo",
+    coordinates: { lat: 35.68, lng: 139.76 },
+    source_url: "https://www.openstreetmap.org/node/123",
+    opening_hours: "Mo-Fr 09:00-17:00",
+    fetched_at: "2026-10-23T00:00:00Z",
+  };
+  const plan = {
+    city: "Tokyo",
+    items: [
+      {
+        time: "09:00",
+        title: venue.name,
+        description: "Fixture",
+        cost: 5,
+        category: "activity",
+        venue,
+      },
+    ],
+    total_cost: 5,
+  };
+  const trip = newDemoTrip();
+  trip.source = "live";
+  trip.places = livePlaces(JSON.stringify(plan));
+  assert.equal(trip.places[0].locationSource.method, "catalogue");
+  assert.equal(
+    snapshot(trip).places[0].locationSource.openingHours,
+    venue.opening_hours,
+  );
+  assert.equal(trip.places[0].coordinates.lat, 35.68);
+  plan.items[0].venue.source_url = "https://attacker.example/fake";
+  assert.throws(() => livePlaces(JSON.stringify(plan)));
+});

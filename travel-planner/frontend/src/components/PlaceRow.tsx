@@ -101,12 +101,35 @@ export default function PlaceRow({
         <div className="place-meta">
           <MapPin size={13} />
           <span>{place.area}</span>
-          {place.locationSource && <Tag>Map match confirmed</Tag>}
+          {place.locationSource && (
+            <Tag>
+              {place.locationSource.method === "catalogue"
+                ? "OSM-listed venue"
+                : "Map match confirmed"}
+            </Tag>
+          )}
           <span className="category-chip">
             <Icon size={12} />
             {categories[place.category]}
           </span>
         </div>
+        {place.locationSource && (
+          <details className="venue-evidence">
+            <summary>Venue source & listed hours</summary>
+            <a href={place.locationSource.url} target="_blank" rel="noreferrer">
+              {place.locationSource.name} on OpenStreetMap
+            </a>
+            <p>
+              {place.locationSource.openingHours
+                ? `Listed hours: ${place.locationSource.openingHours}`
+                : "Opening hours are not listed in this record."}
+            </p>
+            <p>
+              Community listing, not a business confirmation. Hours,
+              availability and prices remain unverified.
+            </p>
+          </details>
+        )}
       </div>
       <div className="place-actions">
         <button

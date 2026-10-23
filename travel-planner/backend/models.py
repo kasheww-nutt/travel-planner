@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class LockedStop(BaseModel):
+    venue_id: str | None = Field(default=None, pattern=r"^(node|way|relation)/[1-9]\d*$")
     id: str = Field(min_length=1, max_length=80, pattern=r"^[a-zA-Z0-9_-]+$")
     title: str = Field(min_length=1, max_length=200)
     time: str = Field(pattern=r"^(?:0[89]|1\d|2[01]):[0-5]\d$|^22:00$")
@@ -72,7 +73,24 @@ class AgentMessage(BaseModel):
             self.timestamp = datetime.now(timezone.utc).isoformat()
 
 
+class GeoPoint(BaseModel):
+    lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    lng: float = Field(ge=-180, le=180, allow_inf_nan=False)
+
+
+class VenueEvidence(BaseModel):
+    id: str = Field(pattern=r"^(node|way|relation)/[1-9]\d*$")
+    name: str = Field(min_length=1, max_length=200)
+    kind: str
+    address: str
+    coordinates: GeoPoint
+    source_url: str = Field(pattern=r"^https://www\.openstreetmap\.org/(node|way|relation)/[1-9]\d*$")
+    opening_hours: str | None = None
+    fetched_at: str
+
+
 class ItineraryItem(BaseModel):
+    venue: VenueEvidence | None = None
     locked_id: str | None = None
     end_time: str = ""
     time: str
@@ -87,11 +105,6 @@ class Itinerary(BaseModel):
     items: list[ItineraryItem]
     total_cost: float
     summary: str = ""
-
-
-class GeoPoint(BaseModel):
-    lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
-    lng: float = Field(ge=-180, le=180, allow_inf_nan=False)
 
 
 class WalkingRequest(BaseModel):

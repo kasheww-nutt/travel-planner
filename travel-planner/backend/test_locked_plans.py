@@ -13,7 +13,7 @@ class LockedPlansTests(unittest.IsolatedAsyncioTestCase):
         bus=MessageBus();agents=fixture(bus,activity_cost=20)
         result=json.loads(await Orchestrator(agents,bus).run(UserInput(city="Tokyo",budget=100,locked_stops=[LOCK])))
         lock=next(i for i in result["items"] if i["locked_id"]=="tea")
-        self.assertEqual(lock,{"locked_id":"tea","time":"17:00","end_time":"18:00","cost":32.0,"title":"Reserved tea","description":"Keep this reservation","category":"activity"})
+        self.assertEqual(lock,{"venue":None,"locked_id":"tea","time":"17:00","end_time":"18:00","cost":32.0,"title":"Reserved tea","description":"Keep this reservation","category":"activity"})
         self.assertEqual(result["total_cost"],92)
         for name in ("transport","dining","activities"):
             self.assertIn("remaining $68.00",agents[name].calls[0])

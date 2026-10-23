@@ -162,7 +162,7 @@ export default function App() {
           <span>
             {mode === "demo"
               ? "Sample itinerary, weather & agent conversation"
-              : "Real Groq agents · suggestions and prices are unverified"}
+              : "Venue catalogue required · hours & prices remain unverified"}
           </span>
           {busy ? (
             <button onClick={cancel}>Cancel planning</button>
@@ -191,15 +191,24 @@ export default function App() {
                 <span className="eyebrow">A LITTLE INSPIRATION</span>
                 <h2>Places worth a little detour.</h2>
               </div>
-              <span className="chip neutral">Tokyo sample collection</span>
+              <span className="chip neutral">
+                {trip.source === "demo"
+                  ? "Tokyo sample collection"
+                  : "Source-backed places in your plan"}
+              </span>
             </div>
             <div className="explore-grid">
-              {newDemoTrip().places.map((place) => (
+              {(trip.source === "demo"
+                ? newDemoTrip().places
+                : trip.places.filter((p) => p.locationSource)
+              ).map((place) => (
                 <button
                   className="explore-place"
                   key={place.id}
                   onClick={() => {
-                    setDialog(`explore:${place.id}`);
+                    setDialog(
+                      `${trip.source === "demo" ? "explore" : "venue"}:${place.id}`,
+                    );
                   }}
                 >
                   <img src={place.image} alt="" />
@@ -211,6 +220,13 @@ export default function App() {
                 </button>
               ))}
             </div>
+            {trip.source === "live" &&
+              !trip.places.some((p) => p.locationSource) && (
+                <p>
+                  No source-backed places yet. Generate a new plan when venue
+                  discovery is available.
+                </p>
+              )}
           </section>
         ) : (
           <div className="dashboard-grid">
@@ -285,7 +301,7 @@ export default function App() {
             <Info size={12} />
             {trip.source === "demo"
               ? "A sample Tokyo day. Weather, costs and locations are illustrative."
-              : "AI estimates · only confirmed place matches get pins. Lines are schematic; travel times and opening hours are unverified."}
+              : "AI estimates · pins use source records or confirmed matches. Green lines are schematic; hours and prices remain unverified."}
           </span>
           <button className="text-link" onClick={() => setDialog("credits")}>
             Photo & map credits
@@ -344,6 +360,7 @@ export default function App() {
                           coordinates: candidate.coordinates,
                           area: candidate.address || candidate.name,
                           locationSource: {
+                            method: "user",
                             name: candidate.name,
                             address: candidate.address,
                             url: candidate.source_url,
@@ -393,7 +410,7 @@ export default function App() {
               <p className="dialog-note">
                 {trip.source === "demo"
                   ? "Scripted sample conversation. Select Live AI to see real backend events."
-                  : "Actual backend events. Status messages describe work stages, not private reasoning."}
+                  : "Actual backend events. Raw agent replies are unvalidated until final checks pass. Status messages describe work stages, not private reasoning."}
               </p>
               {trip.messages.length ? (
                 trip.messages.map((message) => (
@@ -595,6 +612,34 @@ export default function App() {
                 </button>
               )}
             </>
+          ) : dialog.startsWith("venue:") ? (
+            (() => {
+              const p = trip.places.find((p) => p.id === dialog.slice(6));
+              return p?.locationSource ? (
+                <>
+                  <h3>{p.locationSource.name}</h3>
+                  <p>{p.locationSource.address}</p>
+                  <p>
+                    Listed hours:{" "}
+                    {p.locationSource.openingHours || "Not provided"}. These are
+                    unverified community data; check with the venue.
+                  </p>
+                  <p>
+                    Plan estimate {money(p.costUsd)} · current prices and
+                    availability unverified.
+                  </p>
+                  <a
+                    href={p.locationSource.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Inspect the OpenStreetMap source
+                  </a>
+                </>
+              ) : (
+                <p>No source record available for this stop.</p>
+              );
+            })()
           ) : dialog.startsWith("explore:") ? (
             (() => {
               const p = newDemoTrip().places.find(

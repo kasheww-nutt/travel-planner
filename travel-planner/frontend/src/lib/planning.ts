@@ -23,6 +23,26 @@ export const eventSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 const itemSchema = z.object({
+  venue: z
+    .object({
+      id: z.string().regex(/^(node|way|relation)\/[1-9]\d*$/),
+      name: z.string().min(1).max(200),
+      kind: z.string(),
+      address: z.string(),
+      coordinates: z.object({
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+      }),
+      source_url: z
+        .string()
+        .regex(
+          /^https:\/\/www\.openstreetmap\.org\/(node|way|relation)\/[1-9]\d*$/,
+        ),
+      opening_hours: z.string().max(300).nullable(),
+      fetched_at: z.string(),
+    })
+    .nullable()
+    .optional(),
   locked_id: z.string().min(1).nullable().optional(),
   end_time: z.string().default(""),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
@@ -177,6 +197,21 @@ export function livePlaces(content: string, previous: Place[] = []): Place[] {
           : "activity",
       image: "/illustrations/suggestion.svg",
       costUsd: item.cost,
+      ...(item.venue
+        ? {
+            coordinates: item.venue.coordinates,
+            area: item.venue.address,
+            locationSource: {
+              name: item.venue.name,
+              address: item.venue.address,
+              url: item.venue.source_url,
+              confirmedAt: item.venue.fetched_at,
+              fetchedAt: item.venue.fetched_at,
+              method: "catalogue" as const,
+              openingHours: item.venue.opening_hours,
+            },
+          }
+        : {}),
     };
   });
 }

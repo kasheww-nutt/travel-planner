@@ -39,7 +39,7 @@ def weather_label(code):
 class TravelData:
     def __init__(self):
         self.cache = {}
-        self.locks = {name: asyncio.Lock() for name in ("weather", "places", "walking")}
+        self.locks = {name: asyncio.Lock() for name in ("weather", "places", "walking", "catalogue")}
         self.last_request = {name: 0.0 for name in self.locks}
         self.pending = {name: 0 for name in self.locks}
 
@@ -65,15 +65,21 @@ class TravelData:
                 await asyncio.sleep(wait)
             self.last_request[provider] = time.monotonic()
             try:
-                async with httpx.AsyncClient(timeout=8, follow_redirects=False) as client:
-                    response = await client.get(url, params=params, headers={
-                        "User-Agent": "DayTogether-CollegePOC/0.2 (local travel planner)",
-                    })
+                async with httpx.AsyncClient(timeout=25 if provider == "catalogue" else 8, follow_redirects=False) as client:
+                    headers = {"User-Agent": "DayTogether-CollegePOC/0.3 (local travel planner)"}
+                    if provider == "catalogue":
+                        response = await client.post(url, data=params, headers=headers)
+                    else:
+                        response = await client.get(url, params=params, headers=headers)
                     response.raise_for_status()
+                    if provider == "catalogue" and len(response.content) > 2000000:
+                        raise ValueError("Venue response exceeds the prototype's size limit")
                     data = response.json()
                 if not isinstance(data, dict):
                     raise ValueError("Expected an object")
             except (httpx.HTTPError, ValueError) as exc:
+                if provider == "catalogue":
+                    raise TravelDataUnavailable("The venue data provider is unavailable. Try again later.") from None
                 raise TravelDataUnavailable("The data provider is unavailable. Try again later.") from exc
             if len(self.cache) >= 256:
                 self.cache.pop(next(iter(self.cache)))

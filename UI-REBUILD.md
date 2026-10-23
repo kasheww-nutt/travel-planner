@@ -87,4 +87,10 @@ Implemented on 23 October 2026 in this clone:
 
 Provider references: [FOSSGIS usage/privacy](https://routing.openstreetmap.de/about.html), [OSRM route API](https://project-osrm.org/docs/v5.24.0/api/). The modest-use public service is not a production SLA.
 
-Still pending: grounded venue selection before generation, verified opening hours and current prices, transit routing, duration-aware whole-day feasibility, cloud persistence/accounts and the previously recorded backend security hardening. Forecast context, an enforced budget of estimates and one routed leg do not establish a travel-ready itinerary.
+## Venue catalogue phase
+
+The next implementation adds source discovery before paid AI calls, category-specific venue IDs enforced by the backend, canonical source names and coordinates, source/hours details, and source-aware Explore and local persistence. New dining/activity selections must come from the catalogue. Transport is reduced to one unverified allowance rather than publishing invented ticket products. Existing locked/saved legacy suggestions remain unchanged.
+
+Live venue discovery was unavailable during verification, so a successful real-source end-to-end run is still pending. The running app reports the source failure, makes no paid planning calls for that failed attempt, and preserves the old itinerary. It does not insert a fake catalogue. See [venue grounding implementation and validation](qa/VENUE-GROUNDING.md) for the exact boundary and `OVERPASS_API_URL` configuration.
+
+Still pending: successful live venue-provider verification, verified opening hours and current prices, transit routing, duration-aware whole-day feasibility, cloud persistence/accounts and the previously recorded backend security hardening. Source records, a budget of estimates and one routed leg do not establish a travel-ready itinerary.

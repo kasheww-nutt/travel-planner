@@ -178,6 +178,9 @@ export default function usePlanner(setTrip: Dispatch<SetStateAction<Trip>>) {
               .filter((p) => p.isLocked)
               .map((p) => ({
                 id: p.id,
+                venue_id: p.locationSource?.url
+                  .match(/\/(node|way|relation)\/[1-9]\d*$/)?.[0]
+                  .slice(1),
                 title: p.name,
                 time: p.start,
                 end_time: p.end,

@@ -39,6 +39,9 @@ const place = z.object({
         .string()
         .regex(/^https:\/\/www\.openstreetmap\.org\/(node|way|relation)\/\d+$/),
       confirmedAt: z.string().max(50),
+      method: z.enum(["user", "catalogue"]).optional(),
+      openingHours: z.string().max(300).nullable().optional(),
+      fetchedAt: z.string().max(50).optional(),
     })
     .optional(),
   costUsd: z.number().finite().min(0).max(1000000),
@@ -143,13 +146,11 @@ export type SavedTrip = z.infer<typeof savedSchema>;
 export function snapshot(trip: Trip) {
   return tripSchema.parse({
     ...trip,
-    messages: trip.messages
-      .slice(-40)
-      .map((m) => ({
-        ...m,
-        text: m.text.slice(0, 30000),
-        raw: m.raw?.slice(0, 30000),
-      })),
+    messages: trip.messages.slice(-40).map((m) => ({
+      ...m,
+      text: m.text.slice(0, 30000),
+      raw: m.raw?.slice(0, 30000),
+    })),
   });
 }
 export function parseExport(text: string): SavedTrip {

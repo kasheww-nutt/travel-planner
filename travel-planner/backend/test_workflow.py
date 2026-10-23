@@ -161,7 +161,7 @@ class ApiTests(unittest.TestCase):
 
     def test_post_stream_replay_and_cleanup(self):
         fake_client = AsyncMock()
-        with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}), patch("main.AsyncGroq", return_value=fake_client), patch("main.create_agents", side_effect=lambda client, bus: fixture(bus)):
+        with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}), patch("main.AsyncGroq", return_value=fake_client), patch("main.create_agents", side_effect=lambda client, bus: fixture(bus)), patch("main.Orchestrator", side_effect=lambda agents,bus: Orchestrator(agents,bus)):
             with TestClient(main.app) as client:
                 response = client.post("/api/plan", json={"city": "Tokyo", "budget": 100})
                 self.assertEqual(response.status_code, 200)

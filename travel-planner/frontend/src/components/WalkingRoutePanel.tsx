@@ -81,9 +81,10 @@ export default function WalkingRoutePanel({
     <section className="walking-route-panel" aria-label="Walking route lookup">
       <h3>A real walking route, between two places.</h3>
       <p>
-        Only confirmed map matches can be routed. This checks the selected pair,
-        not the whole day's schedule. The route follows mapped footpaths; access
-        restrictions and actual walking pace can differ.
+        Only catalogue locations or confirmed map matches can be routed. This
+        checks the selected pair, not the whole day's schedule. The route
+        follows mapped footpaths; access restrictions and actual walking pace
+        can differ.
       </p>
       {located.length < 2 ? (
         <p>Confirm at least two locations in Places & forecast first.</p>

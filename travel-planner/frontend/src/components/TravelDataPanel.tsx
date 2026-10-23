@@ -189,7 +189,9 @@ export default function TravelDataPanel({
             {selected?.locationSource && (
               <div className="notice">
                 <span>
-                  Confirmed map match:{" "}
+                  {selected.locationSource.method === "catalogue"
+                    ? "Catalogue map record: "
+                    : "Confirmed map match: "}
                   <a
                     href={selected.locationSource.url}
                     target="_blank"

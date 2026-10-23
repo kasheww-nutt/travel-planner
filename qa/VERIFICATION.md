@@ -43,3 +43,13 @@ At the original UI checkpoint, date was a frontend display setting. The travel-d
 - Screenshots: `saved-trips-desktop.png`, `saved-trips-mobile.png`, `walking-route-desktop.png`.
 
 Remaining scope: real venue selection before generation, verified prices/hours, transit routes, new-stop duration and whole-day feasibility, multi-device accounts/storage and broader backend security/dependency hardening. Original app files and private GitHub remote are not modified by this clone's work.
+
+## Catalogue-first venue selection — 23 October 2026
+
+Implementation and exact trust boundary: [VENUE-GROUNDING.md](VENUE-GROUNDING.md).
+
+- Strict TypeScript/production build passed; 44 backend tests and 6 frontend tests passed. Synthetic catalogue HTTP/SSE integration verifies that the production endpoint uses source discovery, validates venue IDs, attaches canonical source records and preserves budget/lock behavior. The lower-level engine test explicitly injects its offline engine, rather than bypassing the production endpoint's default.
+- Added malformed/partial catalogue, private/out-of-region/NaN source, wrong-category, unknown/duplicate ID, injected listing-name, locked source-ID, no-remaining-budget, POST/cache and unsafe endpoint tests. Frontend regression covers coordinates/raw hours/source method through conversion and local storage.
+- The real public venue-provider check failed. Browser displayed “Venue data is unavailable. No paid AI planning has started and your previous itinerary is unchanged.” Previous 11 stops, $133 estimate, two confirmed map matches and the locked 17:00–18:00 tea stop remained. No real successful catalogue/Groq plan is claimed. Screenshot: `venue-source-unavailable.png`.
+- Live Explore showed only the two source-linked places in the saved live plan rather than the five Tokyo sample cards. Its museum detail displayed the actual source link, “Listed hours: Not provided,” and unverified cost/availability disclosure. Those are retained previously confirmed venues, not proof of a newly retrieved catalogue.
+- No real credentials, synthetic fixture catalogues, or operator endpoint changes were installed into the running app's data. A reachable read-only Overpass service is required to complete successful live verification. Default remains the documented public instance; operators can configure `OVERPASS_API_URL`.

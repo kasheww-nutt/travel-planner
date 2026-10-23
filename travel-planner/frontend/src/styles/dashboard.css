@@ -1987,3 +1987,14 @@
 .saved-trips-panel {
   overflow-wrap: anywhere;
 }
+.venue-evidence {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 7px;
+}
+.venue-evidence summary {
+  cursor: pointer;
+}
+.venue-evidence p {
+  font-size: 11px;
+}

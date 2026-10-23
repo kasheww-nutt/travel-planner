@@ -96,7 +96,7 @@ class Orchestrator:
                 "Suggest 3-5 activities for a single day between 08:00 and 22:00."
             ),
         }
-        tasks = {name: f"{task}\n{context}" for name, task in tasks.items()}
+        tasks = {name: f"{task}\n{context}\n{self._specialist_context(name)}" for name, task in tasks.items()}
         for name in SPECIALISTS:
             await self.bus.send(AgentMessage(
                 from_agent="planner", to_agent=name, message_type="task_assignment",
@@ -199,6 +199,9 @@ class Orchestrator:
         )
 
     # ---------- helpers ----------
+
+    def _specialist_context(self, name):
+        return ""
 
     def _specialist_result(self, name: str, raw: str) -> dict:
         data = self._parse_json(raw)

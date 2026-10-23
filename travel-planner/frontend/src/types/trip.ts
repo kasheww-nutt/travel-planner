@@ -30,6 +30,9 @@ export interface Place {
     address: string;
     url: string;
     confirmedAt: string;
+    method?: "user" | "catalogue";
+    openingHours?: string | null;
+    fetchedAt?: string;
   };
   costUsd: number;
   isChanged?: boolean;
