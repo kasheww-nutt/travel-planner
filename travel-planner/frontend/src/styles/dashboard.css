@@ -1998,3 +1998,11 @@
 .venue-evidence p {
   font-size: 11px;
 }
+/* Schedule review stays in a focused dialog rather than crowding the workspace. */
+.schedule-visit, .schedule-leg { padding: 16px 0; border-bottom: 1px solid var(--border, #ded8cd); overflow-wrap: anywhere; }
+.schedule-visit form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 10px 0; }
+.schedule-visit label { display: grid; gap: 4px; }
+.schedule-visit input { max-width: 100%; padding: 8px; border: 1px solid #ded8cd; border-radius: 6px; background: #fffdf9; color: #163d33; }
+.schedule-visit small, .schedule-leg p { color: #62675f; }
+.schedule-conflict { padding: 16px 12px; border-left: 3px solid #ac492d; background: #fff1e9; border-radius: 6px; }
+.schedule-conflict p { color: #82381f; }

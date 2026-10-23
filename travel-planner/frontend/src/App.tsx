@@ -26,6 +26,7 @@ import useForecast from "./hooks/useForecast";
 import TravelDataPanel from "./components/TravelDataPanel";
 import SavedTripsPanel from "./components/SavedTripsPanel";
 import WalkingRoutePanel from "./components/WalkingRoutePanel";
+import SchedulePanel from "./components/SchedulePanel";
 import { tripRouteKey, type WalkingRoute } from "./lib/routing";
 import { readCurrent, writeCurrent } from "./lib/storage";
 import type { Trip, Tab } from "./types/trip";
@@ -176,6 +177,7 @@ export default function App() {
             <MapPin size={12} /> Places & forecast
           </button>
           <button onClick={() => setDialog("saved-trips")}>Saved trips</button>
+          <button onClick={() => setDialog("schedule")}>Review schedule</button>
         </div>
         {error && (
           <div className="error-banner" role="alert">
@@ -324,11 +326,15 @@ export default function App() {
                     credits: "Photography & map credits",
                     "travel-data": "Places & forecast",
                     "saved-trips": "Your saved trips",
+                    schedule: "Can this day fit?",
                   }[dialog] || "A place worth exploring"
           }
           onClose={() => setDialog(null)}
         >
-          {dialog === "saved-trips" ? (
+          {dialog === "schedule" ? (
+            <SchedulePanel trip={trip} route={walkingRoute} busy={busy}
+              onChange={setTrip} onWalking={() => setDialog("transport")} />
+          ) : dialog === "saved-trips" ? (
             <SavedTripsPanel
               trip={trip}
               busy={busy}
